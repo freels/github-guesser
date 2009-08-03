@@ -17,7 +17,7 @@ class Repo
   end
 
   def watches
-    @watches ||= Watch.all_by_repo[id]
+    Watch.all_by_repo[id]
   end
 
   def watchers
@@ -25,15 +25,15 @@ class Repo
   end
 
   def parent
-    @parent ||= self.class[parent_id]
+    self.class[parent_id]
   end
 
   def owner
-    @owner ||= Owner[name]
+    Owner[name]
   end
 
   def langs
-    @langs ||= Lang.all_by_repo[id]
+    Lang.all_by_repo[id]
   end
 
   private

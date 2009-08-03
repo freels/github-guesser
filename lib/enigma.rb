@@ -14,43 +14,54 @@ class Enigma
   end
 
   def guessed_watches
-    guess_from_correlations[0, 10].sort
-  end
+    guesses = guess_from_correlations
 
-  def guess_from_correlations
-    repo_ids = watcher.watches.map{|w| w.repo_id }
-    guesses = Hash.new(0)
-    repo_ids.each do |repo_id|
-      total = (Watch.all_by_repo[repo_id].length rescue 0)
-      weighted_total = (total ** 1.3).to_f
-      (Watch.correlations[repo_id] || {}).each do |id, weight|
-        next if repo_ids.include?(id)
-        guesses[id] += ((weight || 0) / weighted_total)
+    # select best guesses (poor man's heap)
+    result = []
+
+    guesses.each do |new_id, new_weight|
+      index = 0
+      loop do
+        break if result[index].nil?
+        break if new_weight < result[index].last
+        index += 1
       end
+
+      result.insert(index, [new_id, new_weight])
+      result.shift if result.length > 10
     end
 
-    if guesses.length < 100
-      extra_guesses = Hash.new(0)
-      guesses.each do |guess_id, guess_weight|
-        total = (Watch.all_by_repo[guess_id].length rescue 0)
-        weighted_total = (total ** 1.3).to_f
-        (Watch.correlations[guess_id] || {}).each do |id, weight|
-          extra_guesses[id] += ((weight || 0) / weighted_total * guess_weight)
-        end
-      end
-      extra_guesses.merge!(guesses)
-      guesses = extra_guesses
-    end
+    result.reverse!
 
-    threshold = 0.1 #guesses.length / 100.to_f
-    short_guesses = guesses.reject{|k,v| v <= threshold}
-    result = (short_guesses.length < 10 ? guesses : short_guesses).to_a.sort{|a,b| b.last <=> a.last}
-
-
-    print "id:#{id} repos:#{repo_ids.length} guesses(#{guesses.length}): "
+    print "id:#{id} existing:#{watcher.watches.length} guesses(#{guesses.length}): "
     puts result[0,10].map{|g| sprintf "%i:%.3f", *g }.join(', ')
 
     result.map{|g| g.first }
+  end
+
+  def guess_from_correlations
+    # add parent repos, too.
+    repo_ids = watcher.watches.inject([]) do|ids, watch|
+      repo = watch.repo
+      until repo.nil?
+        ids << repo.id
+        repo = repo.parent
+      end
+      ids
+    end.uniq
+
+    repo_ids.inject(Hash.new(0)) do |guesses, repo_id|
+      total = (Watch.all_by_repo[repo_id].length rescue 0)
+      weighted_total = (total ** 1.5).to_f
+
+      (Watch.correlations[repo_id] || {}).each do |id, weight|
+        unless repo_ids.include?(id)
+          guesses[id] += ((weight || 0) / weighted_total)
+        end
+      end
+
+      guesses
+    end
   end  
 
   def to_s

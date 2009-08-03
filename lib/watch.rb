@@ -41,13 +41,8 @@ class Watch
           return @correlations
         end
 
-        count = 0
         @correlations = {}
         all_by_watcher.each do |watcher_id, watches|
-          count += 1
-          if count % 1000 == 0
-            print '`'; $stdout.flush
-          end
           watches.each do |watch|
             watches.each do |other|
               if watch != other
