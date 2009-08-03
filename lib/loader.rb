@@ -70,6 +70,7 @@ module Loader
   def generate_results!
     count = 0    
     print "Reticulating splines"; $stdout.flush
+    Watch.correlations
     3.times do |mod|
       fork {
         puts 'forking...'

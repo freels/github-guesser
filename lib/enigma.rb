@@ -14,7 +14,7 @@ class Enigma
   end
 
   def guessed_watches
-    @guessed_watches ||= guess_from_correlations[0, 10].sort
+    guess_from_correlations[0, 10].sort
   end
 
   def guess_from_correlations
