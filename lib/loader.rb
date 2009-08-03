@@ -70,13 +70,19 @@ module Loader
   def generate_results!
     count = 0    
     print "Reticulating splines"; $stdout.flush
-    File.open('results.txt', 'w') do |fd|
-      count += 1
-      if count % 10 == 0
-        print '.'; $stdout.flush 
-      end
-      Enigma.all.each {|e| fd.puts e.to_s; fd.flush }
+    3.times do |mod|
+      fork {
+        puts 'forking...'
+        File.open("results_#{mod}.txt", 'w') do |fd|
+          Enigma.all.each_with_index do |e,idx|
+            if idx % 3 == mod
+              fd.puts e.to_s; fd.flush
+            end
+          end
+        end
+      }
     end
+    Process.wait
     puts "finished! YOU DO THE MATH!"
   end
 end

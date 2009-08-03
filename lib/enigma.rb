@@ -22,12 +22,26 @@ class Enigma
     guesses = Hash.new(0)
     repo_ids.each do |repo_id|
       total = (Watch.all_by_repo[repo_id].length rescue 0)
-      weighted_total = (total ** 1.5).to_f
+      weighted_total = (total ** 1.3).to_f
       (Watch.correlations[repo_id] || {}).each do |id, weight|
         next if repo_ids.include?(id)
         guesses[id] += ((weight || 0) / weighted_total)
       end
     end
+
+    if guesses.length < 100
+      extra_guesses = Hash.new(0)
+      guesses.each do |guess_id, guess_weight|
+        total = (Watch.all_by_repo[guess_id].length rescue 0)
+        weighted_total = (total ** 1.3).to_f
+        (Watch.correlations[guess_id] || {}).each do |id, weight|
+          extra_guesses[id] += ((weight || 0) / weighted_total * guess_weight)
+        end
+      end
+      extra_guesses.merge!(guesses)
+      guesses = extra_guesses
+    end
+
     threshold = 0.1 #guesses.length / 100.to_f
     short_guesses = guesses.reject{|k,v| v <= threshold}
     result = (short_guesses.length < 10 ? guesses : short_guesses).to_a.sort{|a,b| b.last <=> a.last}
