@@ -12,6 +12,7 @@ class Lang
     self.class.all << self
     self.class.all_by_lang[lang] << self
     self.class.all_by_repo[repo_id] << self
+    self.class.all_by_repo[repo_id].sort! {|a,b| b.lines <=> a.lines }
   end
 
   def repo
@@ -31,15 +32,11 @@ class Lang
     end
 
     def [](lang)
-      all_by_lang(lang)
+      all_by_lang[lang]
     end
 
-    def all_by_lang
+    def all_by_lang[lang]
       @all_by_lang ||= Hash.new {|h,k| h[k] = [] }
-    end
-
-    def all_repos_by_lang(lang)
-      all_by_lang.map{|l| l.repo }
     end
 
     def all_by_repo

@@ -14,6 +14,7 @@ class Repo
     self.class.all[self.id] = self
     self.class.all_by_parent[parent_id] = self if parent_id
     self.class.all_by_owner[owner_name] = self
+    self.class.enter_popularity_contest(self)
   end
 
   def watches
@@ -34,6 +35,10 @@ class Repo
 
   def langs
     Lang.all_by_repo[id]
+  end
+
+  def lang
+    langs.first
   end
 
   private
@@ -65,6 +70,22 @@ class Repo
 
     def all_by_owner
       @all_by_owner ||= Hash.new{|h,k| h[k] = []}
+    end
+
+    def most_popular
+      @most_popular.to_a rescue []
+    end
+
+    def most_popular_by_lang(lang)
+      @most_popular_by_lang[lang].to_a
+    end
+
+    def enter_popularity_contest(repo)
+      @most_popular ||= PQueue.new(10)
+      @most_popular_by_lang ||= Hash.new{|h,k| h[k] = PQueue.new(10)}
+
+      @most_popular.add(repo.watches.length, repo)
+      @most_popular_by_lang.add(repo.watches.length, repo) if repo.lang
     end
   end
 end
