@@ -55,15 +55,17 @@ module Loader
     end
   end
 
+  PROCESSES = 2
+
   def generate_results!
     do_thing "Reticulating splines" do
       Watch.correlations
-      3.times do |mod|
+      PROCESSES.times do |mod|
         fork {
           puts 'forking...'
           File.open("results_#{mod}.txt", 'w') do |fd|
             Enigma.all.each_with_index do |e,idx|
-              if idx % 3 == mod
+              if idx % PROCESSES == mod
                 fd.puts e.to_s; fd.flush
               end
             end
@@ -71,6 +73,9 @@ module Loader
         }
       end
       Process.waitall
+      File.open("results.txt", 'w') do |fd|
+        PROCESSES.times {|mod| fd.puts File.read("results_#{mod}.txt") }
+      end
     end
   end
 end
