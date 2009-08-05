@@ -35,7 +35,7 @@ class Lang
       all_by_lang[lang]
     end
 
-    def all_by_lang[lang]
+    def all_by_lang
       @all_by_lang ||= Hash.new {|h,k| h[k] = [] }
     end
 

@@ -15,78 +15,45 @@ class Enigma
   end
 
   def guessed_watches
-    if parent_repo_ids.length >= 10
-      puts "id:#{id} using parents: #{parent_repo_ids[0,10].join(', ')}"
-      return parent_repo_ids[0,10]
-    end
-
-    from_correlations = guess_from_correlations
+    guess_time = Time.now.to_i
+    guesses = merge_guesses!(guess_from_correlations, guess_from_parents)
+    guess_time = Time.now.to_i - guess_time
 
     # select best guesses (poor man's heap)
     top_ten = PQueue.new(10)
 
-    from_correlations.each do |id, weight|
-      top_ten.add(weight, [id, weight])
-    end
+    sort_time = Time.now.to_i
+    guesses.each {|id, prob| top_ten.add(order, [id, order]) }
+    sort_time = Time.now.to_i - guess_time
 
     top_ten = top_ten.to_a
 
-    print "id:#{id} existing:#{watcher.watches.length} guesses(#{from_correlations.length}): "
-    puts top_ten[0,10].map{|g| sprintf "%i:%.3f", *g }.join(', ')
+    print "id:#{id} existing:#{watcher.watches.length} guesses(#{guesses.length}): "
+    puts top_ten.map{|g| sprintf "%i:%.3f", *g }.join(', ')
+    puts "  seconds elapsed: #{guess_time} (guesses), #{sort_time} (sort)" 
 
     top_ten.map! {|g| g.first }
-
-    (parent_repo_ids + top_ten)[0,10]
+    top_ten
   end
 
-  def parent_repos
-    @parent_repos ||= begin
-      repos = watcher.watches.map {|w| w.repo.parent}.compact.uniq
-      repos.reject! {|r| watched_repo_ids.include? r.id }
-      repos.sort {|a,b| b.watches.length <=> a.watches.length}
-    end
-  end
-
-  def parent_repo_ids
-    @parent_repo_ids = parent_repos.map {|r| r.id }
-  end
-
-  def ancestor_repos
-    @ancestor_repos ||= begin
-      repos = []
-
-      watcher.watches.each do |watch|
-        parent = watch.repo.parent
-        until parent.nil?
-          repos << parent
-          parent = parent.parent
-        end
-      end
-
-      repos.uniq - watched_repos
-    end
-  end
-
-  def ancestor_repo_ids
-    @ancestor_repo_ids ||= ancestor_repos.map {|r| r.id }
-  end
-
-  def watched_repos
-    @watched_repos ||= watcher.watches.map {|w| w.repo }
-  end
-
-  def watched_repo_ids
-    @watched_repo_ids ||= watched_repos.map{|r| r.id }
-  end
+  SIGNIFICANCE = 10
+  PENALTY = 0.05
 
   def guess_from_correlations
-    (watched_repo_ids + ancestor_repo_ids).uniq.inject(Hash.new(0)) do |guesses, repo_id|
-      total = (Watch.all_by_repo[repo_id].length rescue 0)
-      weighted_total = (total ** 1.5).to_f
+    (watcher.repo_ids + watcher.repo_ancestor_ids).uniq.inject({}) do |guesses, repo_id|
+      total = (Watch.all_by_repo[repo_id].length.to_f rescue nil)
 
-      (Watch.correlations[repo_id] || {}).each do |id, weight|
-        unless watched_repo_ids.include?(id)
-          guesses[id] += ((weight || 0) / weighted_total)
+      max_prob = 0.95
+      max_prob -= (PENALTY / SIGNIFICANCE) * (SIGNIFICANCE - total.to_i) if total < SIGNIFICANCE
+
+      if total #i.e. the repo has watches.
+        (Watch.correlations[repo_id] || {}).each do |id, count|
+          unless watcher.repo_ids.include?(id)
+            watch_probability = count / total
+            watch_probability = max_prob if watch_probability > max_prob
+
+            guesses[id] = prob_or(guesses[id] || 0, watch_probability)
+          end
         end
       end
 
@@ -94,8 +61,34 @@ class Enigma
     end
   end
 
+  PARENT_PROBABILITY = 0.95
+
+  def guess_from_parents
+    repos = watcher.watches.map {|w| w.repo.parent.id}.compact
+    repos.inject({}) do |guesses, repo_id|
+      if guesses[repo_id]
+        guesses[repo_id] = prob_or(guesses[repo_id], PARENT_PROBABILITY)
+      else
+        guesses[repo_id] = PARENT_PROBABILITY
+      end
+    end
+  end
+
   def to_s
     "#{id}:#{guessed_watches.join(',')}"
+  end
+
+  private
+
+  def prob_or(a,b)
+    1.0 - (1.0 - a) * (1.0 - b)
+  end
+
+  def merge_guesses!(*guess_hashes)
+    guess_hashes.inject do |guesses, addon|
+      guesses.merge!(addon) {|k,a,b| prob_or(a,b) }
+    end
+    guess_hashes
   end
 
   class << self

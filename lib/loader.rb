@@ -55,11 +55,15 @@ module Loader
     end
   end
 
-  PROCESSES = 2
+  PROCESSES = 6
 
   def generate_results!
     do_thing "Reticulating splines" do
       Watch.correlations
+      if GC.respond_to? :copy_on_write_friendly?
+        GC.copy_on_write_friendly = true
+      end
+      GC.start
       PROCESSES.times do |mod|
         fork {
           puts 'forking...'
