@@ -15,7 +15,7 @@ class Watcher
   end
 
   def repos
-    @repos ||= watches.map{|w| w.repo}.sort_by{|w| w.repo_id}
+    @repos ||= watches.map{|w| w.repo}.sort_by{|r| r.id}
   end
 
   def repo_ancestors

@@ -5,6 +5,10 @@ require 'watch'
 require 'lang'
 require 'enigma'
 
+if GC.respond_to? :copy_on_write_friendly?
+  GC.copy_on_write_friendly = true
+end
+
 module Loader
   extend self
 
@@ -32,7 +36,7 @@ module Loader
   end
 
   def load_langs(datadir)
-    do_thing "Loading repos" do
+    do_thing "Loading langs" do
       File.foreach(File.join(datadir, 'lang.txt')) do |line|
         Lang.parse(line)
       end
@@ -55,14 +59,14 @@ module Loader
     end
   end
 
-  PROCESSES = 6
+  PROCESSES = 1
 
   def generate_results!
     do_thing "Reticulating splines" do
-      Watch.correlations
-      if GC.respond_to? :copy_on_write_friendly?
-        GC.copy_on_write_friendly = true
-      end
+      Enigma.normalize_correlations!      
+    end
+
+    do_thing "Making a go of it" do
       GC.start
       PROCESSES.times do |mod|
         fork {
@@ -77,8 +81,19 @@ module Loader
         }
       end
       Process.waitall
+    end
+
+    do_thing "Putting it all back together" do
+      lines = []
+
+      PROCESSES.times do |mod|
+        lines.concat File.read("results_#{mod}.txt").split("\n")
+      end
+
+      lines.sort!
+
       File.open("results.txt", 'w') do |fd|
-        PROCESSES.times {|mod| fd.puts File.read("results_#{mod}.txt") }
+        lines.each {|l| fd.puts l }
       end
     end
   end
