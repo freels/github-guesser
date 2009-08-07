@@ -8,17 +8,19 @@ class PQueue
     @current = 0
   end
 
-  def add(priority, item)
+  def add(*priorities)
+    item = priorities.pop
+
     @current += 1
 
     # highest numbers first if :descending
-    priority = priority * -1 if @order == :descending
+    priorities.map! {|p| p * -1 } if @order == :descending
 
-    if @list.length >= @length and @list.last.first < priority
+    if @list.length >= @length and (@list.last.first <=> priorities) == -1
       return self
     end
 
-    @list << [priority, @current, item]
+    @list << [priorities, @current, item]
     @list.sort!
     @list.pop if @list.length > @length
     self

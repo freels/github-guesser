@@ -59,7 +59,7 @@ module Loader
     end
   end
 
-  PROCESSES = 1
+  PROCESSES = 3
 
   def generate_results!
     do_thing "Reticulating splines" do

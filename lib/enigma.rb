@@ -27,8 +27,8 @@ class Enigma
     sort_time = Time.now.to_i
     guesses.each do |id, prob|
       next if watches_filter[id]
-      popularity = Watch.all_by_repo[id]
-      top_ten.add([prob, popularity], [id, prob])
+      popularity = Watch.all_by_repo[id].length
+      top_ten.add(prob, popularity, [id, prob])
     end
     sort_time = Time.now.to_i - sort_time
 
