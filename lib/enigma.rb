@@ -34,8 +34,8 @@ class Enigma
 
     top_ten = top_ten.to_a
 
-    print "id:#{id} existing:#{watcher.watches.length} guesses(#{guesses.length}): "
-    puts top_ten.map{|g| sprintf "%i:%.3f", *g }.join(', ')
+    puts "id:#{id} existing:#{watcher.watches.length} guesses(#{guesses.length}): "
+    puts top_ten.map{|g| sprintf "    %6i: %.30f", *g }.join("\n")
     puts "  seconds elapsed: #{guess_time} (guesses), #{sort_time} (sort)" 
 
     top_ten.map {|g| g.first }
@@ -44,6 +44,7 @@ class Enigma
   SIGNIFICANCE = 10
   PENALTY = 0.15
   MAX = 0.75
+  BLEED = 1e-6
 
   def self.normalize_correlations!
     return if @normalized_correlations
@@ -67,7 +68,15 @@ class Enigma
     sources = watcher.repo_ids
     sources.inject({}) do |guesses, repo_id|
       addon = Watch.correlations[repo_id] || {}
-      merge_guesses!(guesses, addon)
+
+      guesses.merge!(addon) do|k,a,b| p = (MAX - (MAX - a) * (MAX - b))
+        if a >= MAX or b >= MAX
+          (a + b) / 2.0 + BLEED
+        else
+          (MAX - (MAX - a) * (MAX - b))
+        end
+      end
+      guesses
     end
   end
 
