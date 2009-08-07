@@ -15,22 +15,29 @@ class Enigma
   end
 
   def guessed_watches
-    guess_time = Time.now.to_i
-    guesses = merge_guesses!(guess_from_correlations, guess_from_parents)
-    guess_time = Time.now.to_i - guess_time
+    guesses = nil
+    guess_time = time do
+      guesses = merge_guesses!(
+        guess_from_popular_stuff,
+        guess_from_preferred_lang,
+        guess_from_author_projects,
+        guess_from_parents,
+        guess_from_correlations
+      )
+    end
 
     watches_filter = watcher.watches.inject({}) {|f, w| f[w.repo_id] = true; f }
 
     # select best guesses (poor man's heap)
     top_ten = PQueue.new(10)
 
-    sort_time = Time.now.to_i
-    guesses.each do |id, prob|
-      next if watches_filter[id]
-      popularity = Watch.all_by_repo[id].length
-      top_ten.add(prob, popularity, [id, prob])
+    sort_time = time do
+      guesses.each do |id, prob|
+        next if watches_filter[id]
+        popularity = Watch.all_by_repo[id].length
+        top_ten.add(prob, popularity, [id, prob])
+      end
     end
-    sort_time = Time.now.to_i - sort_time
 
     top_ten = top_ten.to_a
 
@@ -71,7 +78,7 @@ class Enigma
 
       guesses.merge!(addon) do|k,a,b| p = (MAX - (MAX - a) * (MAX - b))
         if a >= MAX or b >= MAX
-          (a + b) / 2.0 + BLEED
+          (a > b ? a : b) + BLEED
         else
           (MAX - (MAX - a) * (MAX - b))
         end
@@ -80,7 +87,7 @@ class Enigma
     end
   end
 
-  PARENT_PROBABILITY = 0.95
+  PARENT_PROB = 0.95
 
   def guess_from_parents
     repos = watcher.watches.map {|w| w.repo.parent.id if w.repo.parent }.compact
@@ -88,13 +95,50 @@ class Enigma
 
     repos.each do |repo_id|
       if guesses[repo_id]
-        guesses[repo_id] = prob_or(guesses[repo_id], PARENT_PROBABILITY)
+        guesses[repo_id] = prob_or(guesses[repo_id], PARENT_PROB)
       else
-        guesses[repo_id] = PARENT_PROBABILITY
+        guesses[repo_id] = PARENT_PROB
       end
     end
 
     guesses
+  end
+
+  AUTHOR_MAX = 0.95
+
+  def guess_from_author_projects
+    authors = watcher.watches.map {|w| w.repo.owner }
+    author_guesses = {}
+    authors.each do |author|
+      total_watchers = author.repos.inject(0) {|t,r| t + r.watches.length }
+      author.repos.each do |repo|
+        author_guesses[repo.id] = AUTHOR_MAX * repo.watches.length / total_watchers
+      end
+    end
+    author_guesses
+  end
+
+  LANG_PROB = 0.3
+
+  def guess_from_preferred_lang
+    langs = watcher.preferred_langs
+    return {} if langs.empty?
+
+    total = langs.values.inject{|a,b| a+b }
+    max = langs.values.sort.last
+    preferred = langs.index(max)
+    adjusted_prob = LANG_PROB * max / total
+
+    Lang.all_by_name[preferred].inject({}) do |guesses, lang|
+      guesses[lang.repo_id] = adjusted_prob
+      guesses
+    end
+  end
+
+  POP_PROB = 0.1
+
+  def guess_from_popular_stuff
+    Repo.most_popular.inject({}) {|g,r| g[r.id] = POP_PROB; g }
   end
 
   def to_s
@@ -105,6 +149,12 @@ class Enigma
 
   def prob_or(a,b)
     1.0 - (1.0 - a) * (1.0 - b)
+  end
+
+  def time
+    start = Time.now
+    yield
+    Time.now.to_i - start.to_i
   end
 
   def merge_guesses!(*guess_hashes)

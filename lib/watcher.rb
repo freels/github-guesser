@@ -50,6 +50,12 @@ class Watcher
     @repo_ancestor_ids ||= repo_ancestors.map {|r| r.id }
   end
 
+  def preferred_langs
+    @preferred_lang ||= begin
+      repos.inject(Hash.new(0)) {|langs,r| langs[r.lang] += 1 if r.lang; langs }
+    end
+  end
+
   class << self
     def all
       @all ||= {}

@@ -15,7 +15,7 @@ module Loader
   def load!(datadir)
     load_repos(datadir)
     load_watches(datadir)
-    #load_langs(datadir)
+    load_langs(datadir)
     load_enigmas(datadir)
   end
 
@@ -64,10 +64,10 @@ module Loader
   def generate_results!
     do_thing "Reticulating splines" do
       Enigma.normalize_correlations!      
+      GC.start
     end
 
     do_thing "Making a go of it" do
-      GC.start
       PROCESSES.times do |mod|
         fork {
           puts 'forking...'

@@ -12,8 +12,8 @@ class Repo
     instantiate_with data
 
     self.class.all[self.id] = self
-    self.class.all_by_parent[parent_id] = self if parent_id
-    self.class.all_by_owner[owner_name] = self
+    self.class.all_by_parent[parent_id] << self if parent_id
+    self.class.all_by_owner[owner_name] << self
     self.class.enter_popularity_contest(self)
   end
 
@@ -38,7 +38,7 @@ class Repo
   end
 
   def lang
-    langs.first
+    langs.first.name rescue nil
   end
 
   private
@@ -85,7 +85,7 @@ class Repo
       @most_popular_by_lang ||= Hash.new{|h,k| h[k] = PQueue.new(10)}
 
       @most_popular.add(repo.watches.length, repo)
-      @most_popular_by_lang.add(repo.watches.length, repo) if repo.lang
+      @most_popular_by_lang[repo.lang].add(repo.watches.length, repo) if repo.lang
     end
   end
 end
