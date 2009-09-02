@@ -56,6 +56,17 @@ class Watcher
     end
   end
 
+  def nearest_neighbors(count)
+    nearest = PQueue.new(count)
+
+    (Watcher.neighbors[id] || {}).each do |neigbor, shared_count|
+      nearest.add shared_count, [neigbor, shared_count]
+    end
+
+    nearest.to_a
+  end
+
+
   class << self
     def all
       @all ||= {}
@@ -63,6 +74,37 @@ class Watcher
 
     def [](id)
       all[id] ||= new(id)
+    end
+
+    def neighbors
+      @neighbors ||= begin
+        neighbors = {}
+
+        if File.exist?('neighbors.dump')
+          neighbors = Marshal.load(File.read('neighbors.dump'))
+
+        else
+          Watch.all_by_repo.each do |repo_id, watches|
+            watches.each do |w1|
+              watches.each do |w2|
+                id_1 = w1.watcher_id
+                id_2 = w2.watcher_id
+                if id_1 != id_2
+                  neighbors[id_1] ||= {}
+                  neighbors[id_1][id_2] ||= 0
+                  neighbors[id_1][id_2] += 1
+                end
+              end
+            end
+          end
+
+          File.open('neighbors.dump', 'w') do |fd|
+            fd.puts Marshal.dump(neighbors)
+          end
+        end
+
+        neighbors
+      end
     end
   end
 end

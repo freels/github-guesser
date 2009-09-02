@@ -13,9 +13,9 @@ module Loader
   extend self
 
   def load!(datadir)
-    load_repos(datadir)
+    #load_repos(datadir)
     load_watches(datadir)
-    load_langs(datadir)
+    #load_langs(datadir)
     load_enigmas(datadir)
   end
 
@@ -59,7 +59,7 @@ module Loader
     end
   end
 
-  PROCESSES = 2
+  PROCESSES = 1
 
   def generate_results!
     do_thing "Reticulating splines" do

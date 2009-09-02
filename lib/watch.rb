@@ -57,7 +57,6 @@ class Watch
         File.open('correlations.dump', 'w') do |fd|
           fd.puts Marshal.dump(@correlations)
         end
-        #p @correlations
       end
       @correlations
     end

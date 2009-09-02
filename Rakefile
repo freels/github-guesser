@@ -7,3 +7,14 @@ task :default do
   Loader.generate_results!
 end
 
+namespace :stats do
+  task :results do
+    results = File.read('results.txt')
+    lines = results.split("\n")
+    line_count = lines.length
+    watches = lines.map{|l| l.split(':').last.split(',')}.flatten
+    watch_count = watches.length
+    puts "Users: #{line_count}, Watches: #{watch_count}"
+  end
+end
+

@@ -18,11 +18,12 @@ class Enigma
     guesses = nil
     guess_time = time do
       guesses = merge_guesses!(
-        guess_from_popular_stuff,
-        guess_from_preferred_lang,
-        guess_from_author_projects,
-        guess_from_parents,
-        guess_from_correlations
+        #guess_from_popular_stuff,
+        #guess_from_preferred_lang,
+        #guess_from_author_projects,
+        #guess_from_parents,
+        guess_from_neighbors
+        #guess_from_correlations
       )
     end
 
@@ -49,13 +50,15 @@ class Enigma
   end
 
   SIGNIFICANCE = 10
-  PENALTY = 0.15
-  MAX = 0.75
-  BLEED = 1e-6
+  PENALTY = 0.10
+  MAX = 0.6
+  BLEED = 0#1e-6
 
   def self.normalize_correlations!
     return if @normalized_correlations
     @normalized_correlations = true
+
+    Watcher.neighbors
 
     Watch.correlations.each do |repo_id, corr|
       unless corr.empty?
@@ -76,7 +79,7 @@ class Enigma
     sources.inject({}) do |guesses, repo_id|
       addon = Watch.correlations[repo_id] || {}
 
-      guesses.merge!(addon) do|k,a,b| p = (MAX - (MAX - a) * (MAX - b))
+      guesses.merge!(addon) do|k,a,b|
         if a >= MAX or b >= MAX
           (a > b ? a : b) + BLEED
         else
@@ -87,7 +90,33 @@ class Enigma
     end
   end
 
-  PARENT_PROB = 0.95
+  MAX_NEIGHBOR_PROB = 0.9
+  NUM_NEIGHBORS = 10
+  MIN_SIMILARITY = 0.3
+
+  def guess_from_neighbors
+    guesses = {}
+    neighbors = watcher.nearest_neighbors(NUM_NEIGHBORS)
+    
+    neighbors.each do |neighbor_id, shared_watch_count|
+      similarity = shared_watch_count.to_f / watcher.watches.length
+      next if similarity < MIN_SIMILARITY
+
+      Watcher[neighbor_id].watches.each do |watch|
+        repo_id = watch.repo_id
+        if guesses[repo_id]
+          guesses[repo_id] = prob_or(guesses[repo_id], similarity)
+        else
+          guesses[repo_id] = similarity
+        end
+      end
+    end
+
+    guesses.keys.each {|k| guesses[k] = MAX_NEIGHBOR_PROB * k }
+    guesses
+  end
+
+  PARENT_PROB = 0.7
 
   def guess_from_parents
     repos = watcher.watches.map {|w| w.repo.parent.id if w.repo.parent }.compact
@@ -104,7 +133,7 @@ class Enigma
     guesses
   end
 
-  AUTHOR_MAX = 0.95
+  AUTHOR_MAX = 0.6
 
   def guess_from_author_projects
     authors = watcher.watches.map {|w| w.repo.owner }
@@ -118,7 +147,7 @@ class Enigma
     author_guesses
   end
 
-  LANG_PROB = 0.3
+  LANG_PROB = 0.2
 
   def guess_from_preferred_lang
     langs = watcher.preferred_langs
@@ -135,7 +164,7 @@ class Enigma
     end
   end
 
-  POP_PROB = 0.1
+  POP_PROB = 0.001
 
   def guess_from_popular_stuff
     Repo.most_popular.inject({}) {|g,r| g[r.id] = POP_PROB; g }
